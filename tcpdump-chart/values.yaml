@@ -1,0 +1,21 @@
+# values.yaml
+
+repository: 
+  path: "dev-docker.local"
+  password: "KnN6RGpYT0NYQVV0FGVsdDlETlYS"
+  user: "iamuser"
+
+docker:
+  image: "alpine-docker:1.0.0"
+
+tcpdump:
+  image: "alpine-tcpdump:1.0.0"
+
+nodeSelector:
+  kubernetes.io/hostname: "workernode-05"
+
+tolerations:
+  - key: "taintgrp"
+    operator: "Equal"
+    value: "tnt-hg-1"
+    effect: "NoSchedule"

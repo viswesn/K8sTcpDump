@@ -1,0 +1,6 @@
+# Chart.yaml
+
+apiVersion: v2
+name: tcpdump-chart
+description: A Helm chart for deploying a Pod with tcpdump image
+version: 1.0.0
