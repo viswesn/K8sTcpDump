@@ -19,3 +19,9 @@ tolerations:
     operator: "Equal"
     value: "tnt-hg-1"
     effect: "NoSchedule"
+
+env:
+  pcap:
+    hostpath: /tmp
+    noofdays: 10
+    sizeinGB: 1G
