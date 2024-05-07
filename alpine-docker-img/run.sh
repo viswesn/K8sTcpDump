@@ -15,6 +15,11 @@ if [ -z "$CONTAINER" ]; then
     exit 1
 fi
 
+if [ -z "PCAP_PATH" ]; then
+    echo "PCAP_PATH environment variable is not set"
+    exit 1
+fi
+
 # Set the default image name
 image_name="dev-docker.local/alpine-tcpdump:latest"
 
@@ -31,4 +36,4 @@ memory_in_bytes=$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes)
 memory_quota=$((memory_in_bytes / 1000000))m
 
 # Run tcpdump in a container, connecting to the network namespace of the specified container
-docker run -it --rm -v /tmp:/tmp/tcpdump/ --cpus=$cpu_quota --memory=$memory_quota --cap-add=NET_ADMIN --cap-add=CAP_NET_RAW --net container:"$CONTAINER" $image_name 
+docker run -it --rm -v $PCAP_PATH:/tmp/tcpdump/ --cpus=$cpu_quota --memory=$memory_quota --cap-add=NET_ADMIN --cap-add=CAP_NET_RAW --net container:"$CONTAINER" $image_name 
