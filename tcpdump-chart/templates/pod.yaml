@@ -17,6 +17,9 @@ spec:
   - name: tcp-container
     image: "{{ .Values.repository.path }}{{ .Values.docker.image }}"
     imagePullPolicy: Always
+    env:
+      - name: PCAP_PATH 
+        value: {{ .Values.env.pcap.hostpath }}
     stdin: true
     tty: true
     command:
@@ -29,7 +32,11 @@ spec:
         else
              docker pull "{{ .Values.repository.path }}{{ .Values.tcpdump.image }}"
         fi
-        while true; do sleep 3600; done
+        while true; do
+           find "{{ .Values.env.pcap.hostpath }}" -name "*.pcap" -type f -mtime +{{ .Values.env.pcap.noofdays }} -exec rm {} \;
+           find "{{ .Values.env.pcap.hostpath }}" -name "*.pcap" -type f -size +{{ .Values.env.pcap.sizeinGB }} -exec rm {} \;
+           sleep 900; # for 15 min
+        done
     resources:
       limits:
         cpu: 500m
@@ -40,12 +47,12 @@ spec:
     volumeMounts:
     - name: docker-socket
       mountPath: /var/run/docker.sock
-    - name: tmp-dir
+    - name: pcap-dir
       mountPath: /tmp/tcpdump/
   volumes:
   - name: docker-socket
     hostPath:
       path: /var/run/docker.sock
-  - name: tmp-dir
+  - name: pcap-dir
     hostPath:
-      path: /tmp/
+      path: {{ .Values.env.pcap.hostpath }} 
