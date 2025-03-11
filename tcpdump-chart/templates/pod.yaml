@@ -1,14 +1,15 @@
 apiVersion: v1
-kind: Pod
+kind: Pod 
 metadata:
   name: {{ .Release.Name }}-tcpdump-pod
   labels:
-    app: tcpdump
+    app: nokia-tcpdump
     release: {{ .Release.Name }}
   annotations:
     description: "Pod for running tcpdump" 
 spec:
   hostNetwork: true
+  terminationGracePeriodSeconds: 20
   nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 4 }}
   tolerations:
@@ -17,33 +18,58 @@ spec:
   - name: tcp-container
     image: "{{ .Values.repository.path }}{{ .Values.docker.image }}"
     imagePullPolicy: Always
+    lifecycle:
+      preStop:
+        exec:
+          command: ["bash", "-c", "/root/run -s"]
     env:
       - name: PCAP_PATH 
         value: {{ .Values.env.pcap.hostpath }}
+      - name: TCP_IMG_PATH 
+        value: {{ .Values.repository.path }}{{ .Values.tcpdump.image }}
     stdin: true
     tty: true
     command:
       - bash
       - "-c"
       - |
-        echo "{{ .Values.repository.password }}" | base64 -d | docker login -u "{{ .Values.repository.user }}" --password-stdin "{{ .Values.repository.path }}" 
+        echo '{{ .Values.repository.password }}' | base64 -d | docker login -u '{{ .Values.repository.user }}' --password-stdin '{{ .Values.repository.path }}' 
         if docker inspect "{{ .Values.repository.path }}{{ .Values.tcpdump.image }}" &>/dev/null; then
              echo "Docker image already exists locally, skipping pull."
         else
              docker pull "{{ .Values.repository.path }}{{ .Values.tcpdump.image }}"
         fi
         while true; do
+           # Find and delete files older than a specified number of days
            find "{{ .Values.env.pcap.hostpath }}" -name "*.pcap" -type f -mtime +{{ .Values.env.pcap.noofdays }} -exec rm {} \;
-           find "{{ .Values.env.pcap.hostpath }}" -name "*.pcap" -type f -size +{{ .Values.env.pcap.sizeinGB }} -exec rm {} \;
-           sleep 900; # for 15 min
+           # Find files larger than the specified size (in GB)
+           find "{{ .Values.env.pcap.hostpath }}" -name "*.pcap" -type f -size +{{ .Values.env.pcap.sizeinGB }} | while read -r pcap_file; do
+               echo "File $pcap_file exceeds size limit of {{ .Values.env.pcap.sizeinGB }}."
+               # Identify the tcpdump process writing to this file using lsof
+               tcpdump_pid=$(lsof | grep "$pcap_file" | awk '{print $2}' | head -n 1)
+               if [ -n "$tcpdump_pid" ]; then
+                  echo "Killing tcpdump process with PID $tcpdump_pid for file $pcap_file."
+                  kill -9 "$tcpdump_pid"
+               else
+                  echo "No tcpdump process found for file $pcap_file."
+               fi
+               # Delete the oversized file
+               echo "Deleting file $pcap_file."
+               rm -f "$pcap_file"
+           done
+           # Sleep for 15 minutes before the next iteration
+           echo "Going to sleep for 900 seconds"
+           sleep 900 
         done
     resources:
       limits:
         cpu: 500m
         memory: 512Mi
+        ephemeral-storage: "1Gi"
       requests:
         cpu: 200m
         memory: 256Mi
+        ephemeral-storage: "500Mi"
     volumeMounts:
     - name: docker-socket
       mountPath: /var/run/docker.sock
@@ -55,4 +81,4 @@ spec:
       path: /var/run/docker.sock
   - name: pcap-dir
     hostPath:
-      path: {{ .Values.env.pcap.hostpath }} 
+      path: {{ .Values.env.pcap.hostpath }}
